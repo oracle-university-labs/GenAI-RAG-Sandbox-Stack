@@ -31,8 +31,9 @@ resource "oci_core_instance" "dev" {
   }
 
   source_details {
-    source_type = "image"
-    source_id   = local.rg_effective_image_ocid
+    source_type             = "image"
+    source_id               = local.rg_effective_image_ocid
+    boot_volume_size_in_gbs = var.boot_volume_size_gbs
   }
 
   metadata = {

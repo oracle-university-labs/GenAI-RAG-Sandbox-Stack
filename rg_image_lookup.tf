@@ -28,3 +28,13 @@ locals {
   rg_discovered_image_ocid = length(data.oci_core_images.rg_ol8_latest.images) > 0 ? data.oci_core_images.rg_ol8_latest.images[0].id : ""
   rg_effective_image_ocid  = trimspace(var.image_ocid) != "" ? var.image_ocid : local.rg_discovered_image_ocid
 }
+
+# Fail fast if no image was found — prevents cryptic 400 CannotParseRequest from OCI API
+resource "terraform_data" "image_validation" {
+  lifecycle {
+    precondition {
+      condition     = local.rg_effective_image_ocid != ""
+      error_message = "No Oracle Linux 8 image found for shape '${var.instance_shape}' in this region. Set image_ocid manually."
+    }
+  }
+}
