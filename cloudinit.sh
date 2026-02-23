@@ -105,7 +105,7 @@ retry 5 dnf config-manager --set-enabled ol8_addons || true
 retry 5 dnf -y makecache --refresh
 retry 5 dnf -y install \
   git unzip jq tar make gcc gcc-c++ bzip2 bzip2-devel zlib-devel openssl-devel readline-devel libffi-devel \
-  wget curl which xz python3 python3-pip podman firewalld
+  wget curl which xz python3 python3-pip podman firewalld patch ncurses-devel
 
 echo "[STEP] enable firewalld"
 systemctl enable --now firewalld || true
@@ -175,7 +175,7 @@ echo "===== Starting Cloud-Init User Script ====="
 sudo /usr/libexec/oci-growfs -y || true
 
 sudo dnf config-manager --set-enabled ol8_addons || true
-sudo dnf install -y podman git libffi-devel bzip2-devel ncurses-devel readline-devel wget make gcc zlib-devel openssl-devel || true
+sudo dnf install -y podman git libffi-devel bzip2-devel ncurses-devel readline-devel wget make gcc zlib-devel openssl-devel patch || true
 
 # Install latest SQLite from source
 cd /tmp
