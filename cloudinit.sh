@@ -337,6 +337,9 @@ sudo -u opc bash -lc 'source $HOME/.venvs/genai/bin/activate; pip install --no-c
 echo "[STEP] verify JupyterLab installation"
 sudo -u opc bash -lc 'source $HOME/.venvs/genai/bin/activate; jupyter lab --version || { echo "[ERROR] JupyterLab not found, force reinstalling"; pip install --no-cache-dir --force-reinstall jupyterlab==4.2.5; jupyter lab --version; }'
 
+echo "[STEP] register genai venv as default Jupyter kernel"
+sudo -u opc bash -lc 'source $HOME/.venvs/genai/bin/activate; python -m ipykernel install --user --name python3 --display-name "Python 3 (ipykernel)"'
+
 echo "[STEP] install OCI CLI to ~/bin/oci and make PATH global"
 sudo -u opc bash -lc 'curl -sSL https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh -o /tmp/oci-install.sh; bash /tmp/oci-install.sh --accept-all-defaults --exec-dir $HOME/bin --install-dir $HOME/lib/oci-cli --update-path false; grep -q "export PATH=\$HOME/bin" $HOME/.bashrc 2>/dev/null || echo "export PATH=\$HOME/bin:\$PATH" >> $HOME/.bashrc'
 cat >/etc/profile.d/genai-path.sh <<'PROF'
