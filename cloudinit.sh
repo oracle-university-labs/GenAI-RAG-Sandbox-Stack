@@ -73,6 +73,19 @@ fi
 /usr/bin/podman --version || { echo "[PRE] podman installation verification failed"; exit 1; }
 echo "[PRE] Successfully installed Podman and dependencies"
 
+# --------------------------------------------------------------------
+# FIX: Configure Podman cgroup manager for OL8 compatibility
+# Podman 4.9+ defaults to systemd cgroup manager which fails during
+# early boot when systemd scopes can't be created yet.
+# --------------------------------------------------------------------
+mkdir -p /etc/containers
+cat > /etc/containers/containers.conf <<CGCONF
+[engine]
+cgroup_manager = "cgroupfs"
+events_logger = "file"
+CGCONF
+echo "[PRE] Configured Podman cgroup manager (cgroupfs)"
+
 # ====================================================================
 # genai-setup.sh (MAIN provisioning) — kept from your original, with small fixes
 # ====================================================================
@@ -313,6 +326,8 @@ retry 5 dnf -y install python39 python39-pip
 sudo -u opc bash -lc 'python3.9 -m venv $HOME/.venvs/genai || true; echo "source $HOME/.venvs/genai/bin/activate" >> $HOME/.bashrc; source $HOME/.venvs/genai/bin/activate; python -m pip install --upgrade pip wheel setuptools'
 echo "[STEP] install Python libraries"
 sudo -u opc bash -lc 'source $HOME/.venvs/genai/bin/activate; pip install --no-cache-dir jupyterlab==4.2.5 streamlit==1.36.0 oracledb transformers==4.46.3 sentence-transformers==3.3.1 langchain==0.2.6 langchain-community==0.2.6 langchain-core==0.2.11 langchain-text-splitters==0.2.2 langsmith==0.1.83 pypdf==4.2.0 python-multipart==0.0.9 chroma-hnswlib==0.7.3 chromadb==0.5.3 torch==2.5.0 oci oracle-ads'
+echo "[STEP] verify JupyterLab installation"
+sudo -u opc bash -lc 'source $HOME/.venvs/genai/bin/activate; jupyter lab --version || { echo "[ERROR] JupyterLab not found, retrying install"; pip install --no-cache-dir --force-reinstall jupyterlab==4.2.5; }'
 echo "[STEP] install OCI CLI to ~/bin/oci and make PATH global"
 sudo -u opc bash -lc 'retry 5 curl -sSL https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh -o /tmp/oci-install.sh; retry 5 bash /tmp/oci-install.sh --accept-all-defaults --exec-dir $HOME/bin --install-dir $HOME/lib/oci-cli --update-path false; grep -q "export PATH=$HOME/bin" $HOME/.bashrc || echo "export PATH=$HOME/bin:$PATH" >> $HOME/.bashrc'
 cat >/etc/profile.d/genai-path.sh <<'PROF'
@@ -347,7 +362,7 @@ cat >/home/opc/start_jupyter.sh <<'SH'
 #!/bin/bash
 set -eux
 source $HOME/.venvs/genai/bin/activate
-jupyter lab --NotebookApp.token='' --NotebookApp.password='' --ip=0.0.0.0 --port=8888 --no-browser
+jupyter lab --ServerApp.token='' --ServerApp.password='' --ip=0.0.0.0 --port=8888 --no-browser
 SH
 chown opc:opc /home/opc/start_jupyter.sh
 chmod +x /home/opc/start_jupyter.sh
@@ -394,7 +409,7 @@ mkdir -p "$ORADATA_DIR" && chown -R 54321:54321 "$ORADATA_DIR" || true
 retry 5 "$PODMAN" pull "$IMAGE" || true
 "$PODMAN" rm -f "$NAME" || true
 
-retry 5 "$PODMAN" run -d --name "$NAME" --network=host \
+retry 5 "$PODMAN" run -d --replace --name "$NAME" --network=host \
   -e ORACLE_PWD="$ORACLE_PWD" \
   -e ORACLE_PDB="$ORACLE_PDB" \
   -e ORACLE_MEMORY='2048' \
@@ -408,13 +423,13 @@ for i in {1..144}; do
 done
 
 log "opening PDB and saving state..."
-"$PODMAN" exec -e ORACLE_PWD="$ORACLE_PWD" -i "$NAME" bash -lc '
+"$PODMAN" exec -i "$NAME" bash -lc '
   . /home/oracle/.bashrc
-  sqlplus -S -L /nolog <<SQL
-  CONNECT sys/${ORACLE_PWD}@127.0.0.1:1521/FREE AS SYSDBA
-  WHENEVER SQLERROR EXIT SQL.SQLCODE
+  sqlplus -S -L / as sysdba <<SQL
+  WHENEVER SQLERROR CONTINUE
   ALTER PLUGGABLE DATABASE FREEPDB1 OPEN;
   ALTER PLUGGABLE DATABASE FREEPDB1 SAVE STATE;
+  ALTER SYSTEM SET LOCAL_LISTENER="(ADDRESS=(PROTOCOL=TCP)(HOST=0.0.0.0)(PORT=1521))" SCOPE=BOTH;
   ALTER SYSTEM REGISTER;
   EXIT
 SQL
@@ -428,10 +443,10 @@ for i in {1..60}; do
 done
 
 log "creating PDB user 'vector' (idempotent)"
-"$PODMAN" exec -e ORACLE_PWD="$ORACLE_PWD" -i "$NAME" bash -lc '
+"$PODMAN" exec -i "$NAME" bash -lc '
   . /home/oracle/.bashrc
-  sqlplus -S -L /nolog <<SQL
-  CONNECT sys/${ORACLE_PWD}@127.0.0.1:1521/FREEPDB1 AS SYSDBA
+  sqlplus -S -L / as sysdba <<SQL
+  ALTER SESSION SET CONTAINER = FREEPDB1;
   SET DEFINE OFF
   WHENEVER SQLERROR CONTINUE
   CREATE USER vector IDENTIFIED BY "vector";
