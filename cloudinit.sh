@@ -32,6 +32,8 @@ fi
 echo "[PRE] installing Podman and basics"
 
 dnf config-manager --set-disabled ol8_ksplice || true
+dnf config-manager --set-disabled ol8_MySQL84 || true
+dnf config-manager --set-disabled ol8_MySQL84_community || true
 dnf clean all || true
 dnf makecache --refresh || true
 dnf config-manager --set-enabled ol8_addons || true
