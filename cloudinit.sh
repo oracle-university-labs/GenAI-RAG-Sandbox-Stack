@@ -589,6 +589,6 @@ systemctl enable genai-setup.service
 systemctl enable genai-jupyter.service
 systemctl start genai-23ai.service      # DB/bootstrap first
 systemctl start genai-setup.service     # then app/setup
-# genai-jupyter.service starts automatically after setup marker exists
+systemctl start genai-jupyter.service   # Jupyter (waits for setup marker via ExecStartPre)
 
 echo "===== GenAI OneClick: cloud-init done $(date -u) ====="
